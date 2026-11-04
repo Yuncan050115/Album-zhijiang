@@ -21,16 +21,22 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
+          # `cache: pnpm` is deliberately off: no pnpm-lock.yaml is committed in
+          # this repo, and setup-node fails the whole job when the cache key
+          # cannot be resolved. Committing a lockfile is what would let this come
+          # back on — tracked in the issues.
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile=false
 
       - name: Generate Prisma client
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
-          NEXTAUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+          # Prisma 7's `prisma-client` generator only reads prisma/schema.prisma;
+          # it does not open a connection. These are non-secret placeholders so
+          # the step does not depend on repository secrets existing.
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
+          AUTH_SECRET: ci-only-not-a-secret
+          NEXTAUTH_SECRET: ci-only-not-a-secret
         run: pnpm prisma:generate
 
       - name: Lint
@@ -38,8 +44,12 @@ jobs:
 
       - name: Build
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
-          NEXTAUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
+          AUTH_SECRET: ci-only-not-a-secret
+          NEXTAUTH_SECRET: ci-only-not-a-secret
+          AUTH_TRUST_HOST: "true"
+          NEXTAUTH_URL: http://localhost:3000
           NEXT_PUBLIC_ENABLE_REMOTE_BACKGROUND: "true"
+          NEXT_PUBLIC_AUTO_INIT_DB: "false"
+          NODEJS_HELPERS: "0"
         run: pnpm build
